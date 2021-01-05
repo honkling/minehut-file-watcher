@@ -14,19 +14,19 @@ let showHelpCommand = true;
 
 const MINEHUT_API_BASE = 'https://api.minehut.com';
 
-if (argv.setemail) {
-	if (typeof argv.setemail !== 'string')
-		return console.error('Email must be a string'.bold.red);
-	config.set('auth.email', argv.setemail);
-	console.log(`Set email to ${argv.setemail}`.green);
+if (argv.setauthtoken) {
+	if (typeof argv.setauthtoken !== 'string')
+		return console.error('Token must be a string'.bold.red);
+	config.set('auth.token', argv.setauthtoken);
+	console.log(`Set token to ${argv.setauthtoken}`.green);
 	showHelpCommand = false;
 }
 
-if (argv.setpassword) {
-	if (typeof argv.setpassword === 'boolean')
-		return console.error('You must provide a password'.bold.red);
-	config.set('auth.password', argv.setpassword);
-	console.log(`Set password`.green);
+if (argv.setsession) {
+	if (typeof argv.setsession === 'boolean')
+		return console.error('You must provide a session id'.bold.red);
+	config.set('auth.session', argv.setsession);
+	console.log(`Set session id`.green);
 	showHelpCommand = false;
 }
 
@@ -62,9 +62,9 @@ if (argv._.length > 0) {
 		return console.error(
 			"You haven't set a server ID in config. Run `mh-watch` for help.".red
 		);
-	if (!config.get('auth.email') || !config.get('auth.password'))
+	if (!config.get('auth.token') || !config.get('auth.session'))
 		return console.error(
-			'Check your email and password in config. Run `mh-watch` for help.'.red
+			'Check your token and session id in config. Run `mh-watch` for help.'.red
 		);
 	if (!argv.minehutpath)
 		return console.error(
@@ -73,33 +73,19 @@ if (argv._.length > 0) {
 		);
 
 	(async () => {
-		console.log('Logging in to Minehut ...'.yellow);
-		const res = await fetch(`${MINEHUT_API_BASE}/users/login`, {
+		console.log('Validating token and session id ...'.yellow);
+		const res = await fetch(`${MINEHUT_API_BASE}/server/${config.get('server_id')}/all_data`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
 				'User-Agent':
 					'minehut-file-watcher (https://github.com/jellz/minehut-file-watcher)',
+				'authorization': config.get('auth.token'),
+				'x-session-id': config.get('auth.session'),
 			},
-			body: JSON.stringify({
-				email: config.get('auth.email'),
-				password: config.get('auth.password'),
-			}),
 		});
-		if (!res.ok)
-			throw new HttpError(`Bad response: ${JSON.stringify(await res.json())}`);
-		const json = await res.json();
-		if (!json.sessionId)
-			throw new HttpError(
-				`No session ID in login response ${JSON.stringify(await res.json())}`
-			);
-		if (!json.token)
-			throw new HttpError(
-				`No token in login response ${JSON.stringify(await res.json())}`
-			);
-		config.set('auth.session_id', json.sessionId);
-		config.set('auth.token', json.token);
-		console.log('Logged in successfully'.green);
+		if (!res.server) return console.error('Invalid token or session id.');
+		console.log('Token and session id are valid.'.green);
 
 		let remotePath = argv.minehutpath;
 		let localPath = path.join(process.cwd(), argv._[0]);
